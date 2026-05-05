@@ -1,0 +1,161 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import requests
+import json
+import datetime
+
+API_KEY = 'YOUR_API_KEY'  # Замените на свой ключ
+
+def load_history():
+    try:
+        with open('history.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_history(history):
+    with open('history.json', 'w') as f:
+        json.dump(history, f, indent=2)
+
+def get_rates(base='USD'):
+    url = f"https://v6.exchangerate-api.com/v6/{API_KEY}/latest/{base}"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        if data['result'] == 'success':
+            return data['conversion_rates']
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Не удалось получить курсы: {e}")
+    return None
+
+def convert():
+    from_currency = from_var.get()
+    to_currency = to_var.get()
+    amount_str = amount_entry.get()
+
+    try:
+        amount = float(amount_str)
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        messagebox.showerror("Ошибка", "Сумма должна быть положительным числом")
+        return
+
+    rates = get_rates(from_currency)
+    if not rates:
+        return
+
+    if to_currency not in rates:
+        messagebox.showerror("Ошибка", "Не удалось найти выбранную валюту")
+        return
+
+    result = amount * rates[to_currency]
+    result_label.config(text=f"Результат: {result:.2f} {to_currency}")
+
+    # Сохранение в историю
+    history = load_history()
+    history.append({
+        "date": str(datetime.datetime.now()),
+        "from": from_currency,
+        "to": to_currency,
+        "amount": amount,
+        "result": result,
+        "rate": rates[to_currency]
+    })
+    save_history(history)
+    update_history_table()
+
+def update_history_table():
+    for i in history_table.get_children():
+        history_table.delete(i)
+    history = load_history()
+    for entry in history:
+        history_table.insert('', 'end', values=(
+            entry['date'],
+            entry['from'],
+            entry['to'],
+            entry['amount'],
+            entry['result'],
+            entry['rate']
+        ))
+
+# --- Интерфейс ---
+root = tk.Tk()
+root.title("Currency Converter")
+root.geometry("700x500")
+
+# Валюты
+currencies = ["USD", "EUR", "RUB", "GBP", "JPY", "CNY"]  # Можно подгружать из API
+
+from_var = tk.StringVar(value="USD")
+to_var = tk.StringVar(value="EUR")
+
+tk.Label(root, text="Из:").grid(row=0, column=0, padx=10, pady=10)
+from_menu = ttk.Combobox(root, textvariable=from_var, values=currencies)
+from_menu.grid(row=0, column=1, padx=10, pady=10)
+
+tk.Label(root, text="В:").grid(row=0, column=2, padx=10, pady=10)
+to_menu = ttk.Combobox(root, textvariable=to_var, values=currencies)
+to_menu.grid(row=0, column=3, padx=10, pady=10)
+
+# Сумма
+tk.Label(root, text="Сумма:").grid(row=1, column=0, padx=10, pady=10)
+amount_entry = tk.Entry(root)
+amount_entry.grid(row=1, column=1, columnspan=3, padx=10, pady=10, sticky="ew")
+
+# Кнопка
+convert_btn = tk.Button(root, text="Конвертировать", command=convert)
+convert_btn.grid(row=2, column=0, columnspan=4, pady=10)
+
+# Результат
+result_label = tk.Label(root, text="Результат: ")
+result_label.grid(row=3, column=0, columnspan=4, pady=10)
+
+# История
+history_frame = tk.Frame(root)
+history_frame.grid(row=4, column=0, columnspan=4, pady=10)
+
+history_table = ttk.Treeview(history_frame, columns=(
+    "Дата", "Из", "В", "Сумма", "Результат", "Курс"), show='headings')
+for col in history_table['columns']:
+    history_table.heading(col, text=col)
+history_table.pack(fill="both", expand=True)
+
+update_history_table()
+
+root.mainloop()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
